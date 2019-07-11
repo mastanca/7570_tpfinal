@@ -2,15 +2,17 @@
 
 #
 # Can run directly calling `python3 neural_network.py [csvpath]`
+# 
+# Raw:      91.36%, 4m 3s
+# Balanced: 77.23%, 1m 38s
 #
-
 
 """
 Se setean las semillas de randoms de numpy y tensorflow para tener consistencia entre corridas
 """
 
 import sys 
-
+import random
 import numpy as np
 np.random.seed(91218) # Set np seed for consistent results across runs
 
@@ -42,6 +44,7 @@ def show_progress(done, total, size=100):
 
   
 def process_row(row):
+  # Remove ID_code column
   return list(map(lambda value: float(value), row[1:]))
   
 
@@ -49,7 +52,7 @@ def get_minmax(minmax, value):
   if not minmax: minmax = {'min': float('inf'), 'max': float('-inf')}
   return {'min': min(minmax['min'], value), 'max': max(minmax['max'], value)}
 
-def extract_data(csvfile):
+def extract_data(csvfile, balanced=False):
   print('Reading csv...')
 
   rows = csvfile.read().splitlines()
@@ -63,6 +66,7 @@ def extract_data(csvfile):
   results = []
   minmaxs = {}
   i = 0
+  target1count = 0
   print('Processing data...')
   for row in rawdata:
     i += 1
@@ -70,6 +74,15 @@ def extract_data(csvfile):
     processed = process_row(row)
     results.append(processed)  
     minmaxs = {i: get_minmax(minmaxs.setdefault(i, None), processed[i]) for i in range(len(processed))}
+    if processed[0] == 1.0: target1count += 1
+
+  if balanced:
+    print('Balancing data...')
+    # We assume there are less 1's than 0's
+    limit = len(results) - 2 * target1count
+    results.sort(key=lambda row: row[0]) # Sort by target
+    results = list(map(lambda pair: pair[1], filter(lambda pair: pair[0] >= limit, enumerate(results))))
+    results.sort(key=lambda row: random.random())
 
   print('Normalizing rows...')
   results = list(map(lambda row: normalize_row(row, minmaxs), results))
@@ -95,6 +108,7 @@ def main():
   Se cargan los datos sin categorizar y categorizados.
   Se toman las primeras 8 columnas como features y la ultima como output.
   """
+
 
   csvpath = sys.argv[1] if len(sys.argv) > 1 else DEAFULT_CSVPATH
   csv = open(csvpath, 'r')
